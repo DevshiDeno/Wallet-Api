@@ -3,14 +3,52 @@ const router = express.Router();
 const db = require("../db");
 const { v4: uuidv4 } = require("uuid");
 
+
+router.post("/deposit", (req, res) => {
+  const { accountId, amount } = req.body;
+
+  if (!accountId) {
+    return res.status(400).json({ message: "Account id is required" });
+  }
+
+  if (amount <= 0) {
+    return res.status(400).json({ message: "Amount must be greater than zero" });
+  }
+
+  db.get(
+    "SELECT * FROM accounts WHERE id = ?",
+    [accountId],
+    (err, account) => {
+      if (!account) {
+        return res.status(500).json({ message: "Account not found" });
+      }
+
+      const newBalance = account.balance + amount;
+
+      db.run("UPDATE accounts SET balance = ? WHERE id = ?", [newBalance, accountId]);
+
+      db.run(
+        `INSERT INTO transactions 
+         (id, type, amount, sender_account_id, receiver_account_id)
+         VALUES (?, ?, ?, ?, ?)`,
+        [uuidv4(), "deposit", amount, accountId, null]
+      );
+
+      res.json({ message: "Deposit successful" });
+    }
+  );
+});
+
 router.post("/transfer", (req, res) => {
 
   const { senderId, receiverId, amount } = req.body;
 
-  if (!senderId || !receiverId || amount <= 0) {
+  if (!senderId || !receiverId ) {
     return res.status(400).json({ message: "Invalid input" });
   }
-
+if(!amount || amount <= 0) {
+    return res.status(400).json({ message: "Amount must be greater than zero" });
+  }
   if (senderId === receiverId) {
     return res.status(400).json({ message: "Cannot transfer to same account" });
   }
